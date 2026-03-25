@@ -1,7 +1,8 @@
-const BASE = process.env.NEXT_PUBLIC_ENGINE_API || 'http://localhost:3001';
+const ENGINE_BASE = process.env.NEXT_PUBLIC_ENGINE_API || 'http://localhost:3001';
+const FINDER_BASE = process.env.NEXT_PUBLIC_FINDER_API || 'http://localhost:8000';
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+async function request<T>(base: string, path: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(`${base}${path}`, {
     ...options,
     headers: { 'Content-Type': 'application/json', ...options?.headers },
   });
@@ -9,69 +10,73 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
-// ─── 数据查询 ───
+const engine = <T>(path: string, options?: RequestInit) => request<T>(ENGINE_BASE, path, options);
+const finder = <T>(path: string, options?: RequestInit) => request<T>(FINDER_BASE, path, options);
 
-export const getStats = () => request<{ code: number; data: import('./types').Stats }>('/api/stats');
+// ─── Engine 数据查询 ───
+
+export const getStats = () => engine<{ code: number; data: import('./types').Stats }>('/api/stats');
 
 export const getSignals = (params?: { status?: string; limit?: number; offset?: number }) => {
   const q = new URLSearchParams();
   if (params?.status) q.set('status', params.status);
   if (params?.limit) q.set('limit', String(params.limit));
   if (params?.offset) q.set('offset', String(params.offset));
-  return request<{ code: number; data: import('./types').Signal[]; total: number }>(`/api/signals?${q}`);
+  return engine<{ code: number; data: import('./types').Signal[]; total: number }>(`/api/signals?${q}`);
 };
 
 export const getSignal = (address: string) =>
-  request<{ code: number; data: import('./types').Signal }>(`/api/signals/${address}`);
+  engine<{ code: number; data: import('./types').Signal }>(`/api/signals/${address}`);
 
 export const getTrades = (limit = 50) =>
-  request<{ code: number; data: import('./types').Trade[] }>(`/api/trades?limit=${limit}`);
+  engine<{ code: number; data: import('./types').Trade[] }>(`/api/trades?limit=${limit}`);
 
 export const getPositions = () =>
-  request<{ code: number; data: import('./types').Position[] }>('/api/positions');
+  engine<{ code: number; data: import('./types').Position[] }>('/api/positions');
 
 export const getAnalysisHistory = (params?: { limit?: number; narrative_type?: string }) => {
   const q = new URLSearchParams();
   if (params?.limit) q.set('limit', String(params.limit));
   if (params?.narrative_type) q.set('narrative_type', params.narrative_type);
-  return request<{ code: number; data: unknown[] }>(`/api/analysis/history?${q}`);
+  return engine<{ code: number; data: unknown[] }>(`/api/analysis/history?${q}`);
 };
 
 export const getPatterns = () =>
-  request<{ code: number; data: { narrative_type: string; total: number; approved: number; rejected: number }[] }>('/api/analysis/patterns');
+  engine<{ code: number; data: { narrative_type: string; total: number; approved: number; rejected: number }[] }>('/api/analysis/patterns');
 
 export const getNarratives = () =>
-  request<{ code: number; data: import('./types').NarrativeGroup[] }>('/api/narratives');
+  engine<{ code: number; data: import('./types').NarrativeGroup[] }>('/api/narratives');
 
-// ─── 系统状态 ───
+// ─── Engine 状态 + 配置 ───
 
-export const getStatus = () => request<{ code: number; status: string }>('/api/status');
+export const getEngineStatus = () => engine<{ code: number; status: string }>('/api/status');
 
-// ─── Engine 配置 ───
-
-export const getConfig = () => request<{ code: number; data: Record<string, unknown> }>('/api/config');
+export const getConfig = () => engine<{ code: number; data: Record<string, unknown> }>('/api/config');
 
 export const updateConfig = (rules: Record<string, unknown>) =>
-  request<{ code: number }>('/api/config', { method: 'PUT', body: JSON.stringify({ rules }) });
+  engine<{ code: number }>('/api/config', { method: 'PUT', body: JSON.stringify({ rules }) });
 
-// ─── 账号管理 ───
+// ─── Finder 账号管理（调用 finder API）───
 
 export const getAccounts = () =>
-  request<{ code: number; data: import('./types').Account[] }>('/api/accounts');
+  finder<{ code: number; data: import('./types').Account[] }>('/api/accounts');
 
 export const createAccount = (data: { email: string; gmail_password: string; proxy?: string }) =>
-  request<{ code: number; data: import('./types').Account }>('/api/accounts', { method: 'POST', body: JSON.stringify(data) });
+  finder<{ code: number; data: import('./types').Account }>('/api/accounts', { method: 'POST', body: JSON.stringify(data) });
 
 export const updateAccount = (id: number, data: Partial<{ email: string; gmail_password: string; proxy: string | null; enabled: boolean }>) =>
-  request<{ code: number }>(`/api/accounts/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  finder<{ code: number }>(`/api/accounts/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 
 export const deleteAccount = (id: number) =>
-  request<{ code: number }>(`/api/accounts/${id}`, { method: 'DELETE' });
+  finder<{ code: number }>(`/api/accounts/${id}`, { method: 'DELETE' });
 
-// ─── Finder 配置 ───
+// ─── Finder 配置（调用 finder API）───
 
 export const getFinderConfig = () =>
-  request<{ code: number; data: import('./types').FinderConfig; minInterval: number }>('/api/finder/config');
+  finder<{ code: number; data: import('./types').FinderConfig; minInterval: number }>('/api/finder/config');
 
 export const updateFinderConfig = (data: Partial<import('./types').FinderConfig>) =>
-  request<{ code: number }>('/api/finder/config', { method: 'PUT', body: JSON.stringify(data) });
+  finder<{ code: number }>('/api/finder/config', { method: 'PUT', body: JSON.stringify(data) });
+
+export const getFinderStatus = () =>
+  finder<{ code: number; scraper: Record<string, unknown> }>('/api/status');

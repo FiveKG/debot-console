@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { getEngineStatus, getFinderStatus } from '@/lib/api';
 
 export default function SystemPage() {
   const [engineStatus, setEngineStatus] = useState<string>('unknown');
@@ -11,23 +12,16 @@ export default function SystemPage() {
 
   const fetchStatus = async () => {
     try {
-      const engineApi = process.env.NEXT_PUBLIC_ENGINE_API || 'http://localhost:3001';
-      const finderApi = process.env.NEXT_PUBLIC_FINDER_API || 'http://localhost:8000';
-
-      // Engine
       try {
-        const r = await fetch(`${engineApi}/api/status`);
-        const d = await r.json();
-        setEngineStatus(d.status || 'error');
+        const r = await getEngineStatus();
+        setEngineStatus(r.status || 'error');
       } catch {
         setEngineStatus('offline');
       }
 
-      // Finder
       try {
-        const r = await fetch(`${finderApi}/api/status`);
-        const d = await r.json();
-        setFinderStatus(d.scraper || null);
+        const r = await getFinderStatus();
+        setFinderStatus(r.scraper || null);
       } catch {
         setFinderStatus(null);
       }
