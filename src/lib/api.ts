@@ -1,4 +1,4 @@
-const ENGINE_BASE = process.env.NEXT_PUBLIC_ENGINE_API || 'http://localhost:3000';
+const ENGINE_BASE = process.env.NEXT_PUBLIC_ENGINE_API || 'http://localhost:3002';
 const FINDER_BASE = process.env.NEXT_PUBLIC_FINDER_API || 'http://localhost:3001';
 
 async function request<T>(base: string, path: string, options?: RequestInit): Promise<T> {
