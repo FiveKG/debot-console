@@ -1,5 +1,5 @@
-const ENGINE_BASE = process.env.NEXT_PUBLIC_ENGINE_API || 'http://localhost:3001';
-const FINDER_BASE = process.env.NEXT_PUBLIC_FINDER_API || 'http://localhost:8000';
+const ENGINE_BASE = process.env.NEXT_PUBLIC_ENGINE_API || 'http://localhost:3000';
+const FINDER_BASE = process.env.NEXT_PUBLIC_FINDER_API || 'http://localhost:3001';
 
 async function request<T>(base: string, path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${base}${path}`, {
@@ -49,7 +49,7 @@ export const getNarratives = () =>
 
 // ─── Engine 状态 + 配置 ───
 
-export const getEngineStatus = () => engine<{ code: number; status: string }>('/api/status');
+export const getEngineStatus = () => engine<{ code: number; status: string; mode: string }>('/api/status');
 
 export const getConfig = () => engine<{ code: number; data: Record<string, unknown> }>('/api/config');
 
