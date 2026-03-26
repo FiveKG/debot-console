@@ -8,7 +8,6 @@ export interface Signal {
   price: number;
   liquidity: number;
   holder_count: number;
-  smart_wallet_count: number;
   signal_count: number;
   signal_time: number;
   status: 'init' | 'pending_analysis' | 'approved' | 'watch' | 'rejected' | 'error';
@@ -72,7 +71,7 @@ export interface Account {
 export interface FinderConfig {
   poll_interval_seconds: string;
   chain: string;
-  duration: string;
+  page_size: string;
 }
 
 export interface NarrativeGroup {

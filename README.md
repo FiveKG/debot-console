@@ -1,36 +1,45 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Debot Console
 
-## Getting Started
+Debot 系统前端仪表盘。信号列表、交易记录、持仓监控、叙事追踪、配置管理。
 
-First, run the development server:
+## 技术栈
+
+- **Next.js** — React 全栈框架
+- **Tailwind CSS + shadcn/ui** — UI 组件
+- **TypeScript** — 类型安全
+
+## 安装
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 运行
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# 开发
+npm run dev
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# 构建 + 启动
+npm run build && npm start
+```
 
-## Learn More
+默认端口 8080。
 
-To learn more about Next.js, take a look at the following resources:
+## 页面
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| 页面 | 说明 |
+|------|------|
+| `/` | Dashboard — 统计概览 |
+| `/signals` | 信号列表 — 状态筛选、分析日志时间线 |
+| `/trades` | 交易记录 |
+| `/positions` | 持仓监控 |
+| `/narratives` | 叙事追踪 |
+| `/config` | 配置管理 — Finder 设置、账号管理、Engine 规则 |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## API 对接
 
-## Deploy on Vercel
+- Engine API: `localhost:3002`（信号/交易/统计/配置）
+- Finder API: `localhost:3001`（账号/爬取配置/状态）
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+配置在 `src/lib/api.ts` 中修改。

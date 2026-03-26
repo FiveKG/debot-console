@@ -25,8 +25,7 @@ export default function ConfigPage() {
   const [accountMsg, setAccountMsg] = useState('');
 
   // Finder config
-  const [finderCfg, setFinderCfg] = useState<FinderConfig>({ poll_interval_seconds: '1', chain: 'solana', duration: '5m' });
-  const [minInterval, setMinInterval] = useState(1);
+  const [finderCfg, setFinderCfg] = useState<FinderConfig>({ poll_interval_seconds: '1', chain: 'solana', page_size: '50' });
   const [finderMsg, setFinderMsg] = useState('');
 
   useEffect(() => {
@@ -39,7 +38,6 @@ export default function ConfigPage() {
 
     getFinderConfig().then(r => {
       setFinderCfg(r.data);
-      setMinInterval(r.minInterval);
     }).catch(console.error);
   }, []);
 
@@ -84,8 +82,8 @@ export default function ConfigPage() {
   const saveFinderConfig = async () => {
     try {
       const interval = parseFloat(finderCfg.poll_interval_seconds);
-      if (interval < minInterval) {
-        setFinderMsg(`Min interval: ${minInterval}s (6 / accounts)`);
+      if (!interval || interval <= 0) {
+        setFinderMsg('Interval must be a positive number');
         return;
       }
       await updateFinderConfig(finderCfg);
@@ -117,12 +115,11 @@ export default function ConfigPage() {
                   <label className="text-sm text-muted-foreground">Poll Interval (seconds)</label>
                   <Input
                     type="number"
-                    min={minInterval}
+                    min={0.1}
                     step="0.5"
                     value={finderCfg.poll_interval_seconds}
                     onChange={e => setFinderCfg({ ...finderCfg, poll_interval_seconds: e.target.value })}
                   />
-                  <p className="text-xs text-muted-foreground mt-1">Min: {minInterval}s (6 / accounts)</p>
                 </div>
                 <div>
                   <label className="text-sm text-muted-foreground">Chain</label>
@@ -135,14 +132,14 @@ export default function ConfigPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-sm text-muted-foreground">Duration</label>
-                  <select
-                    className="flex h-10 w-full rounded-md border px-3 py-2 text-sm"
-                    value={finderCfg.duration}
-                    onChange={e => setFinderCfg({ ...finderCfg, duration: e.target.value })}
-                  >
-                    {['5m', '1h', '6h', '24h'].map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
+                  <label className="text-sm text-muted-foreground">Page Size</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={finderCfg.page_size}
+                    onChange={e => setFinderCfg({ ...finderCfg, page_size: e.target.value })}
+                  />
                 </div>
               </div>
               <div className="flex items-center gap-2">
