@@ -28,6 +28,9 @@ export const getSignals = (params?: { status?: string; limit?: number; offset?: 
 export const getSignal = (address: string) =>
   engine<{ code: number; data: import('./types').Signal }>(`/api/signals/${address}`);
 
+export const getSignalLogs = (address: string) =>
+  engine<{ code: number; data: { id: number; token_address: string; step: string; status: string; message: string; metadata: string; created_at: string }[] }>(`/api/signals/${address}/logs`);
+
 export const getTrades = (limit = 50) =>
   engine<{ code: number; data: import('./types').Trade[] }>(`/api/trades?limit=${limit}`);
 

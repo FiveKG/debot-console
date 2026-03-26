@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { getSignals } from '@/lib/api';
+import { getSignals, getSignalLogs } from '@/lib/api';
 import type { Signal } from '@/lib/types';
 
 const statuses = ['', 'init', 'pending_analysis', 'approved', 'watch', 'rejected', 'error'];
@@ -17,11 +17,25 @@ const statusColor: Record<string, string> = {
   error: 'bg-orange-500',
 };
 
+const stepIcon: Record<string, string> = {
+  passed: '✅',
+  rejected: '⛔',
+  warning: '⚠️',
+  error: '❌',
+  skipped: '⏭',
+  watch: '👀',
+};
+
+type LogEntry = { id: number; step: string; status: string; message: string; metadata: string; created_at: string };
+
 export default function SignalsPage() {
   const [signals, setSignals] = useState<Signal[]>([]);
   const [total, setTotal] = useState(0);
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(0);
+  const [expandedAddr, setExpandedAddr] = useState<string | null>(null);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
   const limit = 20;
 
   const fetchData = async () => {
@@ -34,12 +48,36 @@ export default function SignalsPage() {
     }
   };
 
-  useEffect(() => { fetchData(); }, [status, page]);
+  useEffect(() => {
+    fetchData();
+    const timer = setInterval(fetchData, 5000);
+    return () => clearInterval(timer);
+  }, [status, page]);
+
+  const toggleLogs = async (addr: string) => {
+    if (expandedAddr === addr) {
+      setExpandedAddr(null);
+      setLogs([]);
+      return;
+    }
+    setExpandedAddr(addr);
+    setLogsLoading(true);
+    try {
+      const res = await getSignalLogs(addr);
+      setLogs(res.data);
+    } catch (e) {
+      setLogs([]);
+    }
+    setLogsLoading(false);
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Signals</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold">Signals</h1>
+          <button onClick={fetchData} className="text-sm px-3 py-1 border rounded hover:bg-muted">Refresh</button>
+        </div>
         <div className="flex gap-2">
           {statuses.map((s) => (
             <button
@@ -59,10 +97,10 @@ export default function SignalsPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead></TableHead>
                 <TableHead>Symbol</TableHead>
                 <TableHead>Market Cap</TableHead>
                 <TableHead>Price</TableHead>
-                <TableHead>Liquidity</TableHead>
                 <TableHead>Twitter</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Time</TableHead>
@@ -70,53 +108,66 @@ export default function SignalsPage() {
             </TableHeader>
             <TableBody>
               {signals.map((s) => (
-                <TableRow key={s.id}>
-                  <TableCell className="font-medium">
-                    <div>{s.symbol}</div>
-                    <div className="text-xs text-muted-foreground">{s.token_address.slice(0, 12)}...</div>
-                  </TableCell>
-                  <TableCell>${Math.round(s.market_cap).toLocaleString()}</TableCell>
-                  <TableCell>${s.price?.toFixed(8)}</TableCell>
-                  <TableCell>${Math.round(s.liquidity).toLocaleString()}</TableCell>
-                  <TableCell>
-                    {s.twitter_url ? (
-                      <a href={s.twitter_url} target="_blank" rel="noopener noreferrer" className="text-blue-500 text-xs hover:underline">
-                        Link
-                      </a>
-                    ) : '-'}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary" className={`${statusColor[s.status] || ''} text-white text-xs`}>
-                      {s.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {new Date(s.created_at).toLocaleString()}
-                  </TableCell>
-                </TableRow>
+                <>
+                  <TableRow key={s.id} className="cursor-pointer" onClick={() => toggleLogs(s.token_address)}>
+                    <TableCell className="w-8 text-center">
+                      {expandedAddr === s.token_address ? '▼' : '▶'}
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      <div>{s.symbol}</div>
+                      <div className="text-xs text-muted-foreground">{s.token_address.slice(0, 12)}...</div>
+                    </TableCell>
+                    <TableCell>${Math.round(s.market_cap).toLocaleString()}</TableCell>
+                    <TableCell>${s.price?.toFixed(8)}</TableCell>
+                    <TableCell>
+                      {s.twitter_url ? (
+                        <a href={s.twitter_url} target="_blank" rel="noopener noreferrer" className="text-blue-500 text-xs hover:underline" onClick={e => e.stopPropagation()}>
+                          Link
+                        </a>
+                      ) : '-'}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className={`${statusColor[s.status] || ''} text-white text-xs`}>
+                        {s.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {new Date(s.created_at).toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                  {expandedAddr === s.token_address && (
+                    <TableRow key={`${s.id}-logs`}>
+                      <TableCell colSpan={7} className="bg-muted/30 p-4">
+                        {logsLoading ? (
+                          <div className="text-sm text-muted-foreground">Loading...</div>
+                        ) : logs.length === 0 ? (
+                          <div className="text-sm text-muted-foreground">No analysis logs</div>
+                        ) : (
+                          <div className="space-y-1 font-mono text-xs">
+                            {logs.map((log) => (
+                              <div key={log.id} className="flex gap-2">
+                                <span className="text-muted-foreground w-16 shrink-0">
+                                  {new Date(log.created_at).toLocaleTimeString()}
+                                </span>
+                                <span className="w-5">{stepIcon[log.status] || '•'}</span>
+                                <span className="text-muted-foreground w-36 shrink-0">{log.step}</span>
+                                <span>{log.message}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
               ))}
             </TableBody>
           </Table>
 
-          {/* 分页 */}
           <div className="flex justify-between items-center mt-4">
-            <button
-              onClick={() => setPage(Math.max(0, page - 1))}
-              disabled={page === 0}
-              className="text-sm px-3 py-1 border rounded disabled:opacity-50"
-            >
-              Previous
-            </button>
-            <span className="text-sm text-muted-foreground">
-              Page {page + 1} of {Math.ceil(total / limit) || 1}
-            </span>
-            <button
-              onClick={() => setPage(page + 1)}
-              disabled={(page + 1) * limit >= total}
-              className="text-sm px-3 py-1 border rounded disabled:opacity-50"
-            >
-              Next
-            </button>
+            <button onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0} className="text-sm px-3 py-1 border rounded disabled:opacity-50">Previous</button>
+            <span className="text-sm text-muted-foreground">Page {page + 1} of {Math.ceil(total / limit) || 1}</span>
+            <button onClick={() => setPage(page + 1)} disabled={(page + 1) * limit >= total} className="text-sm px-3 py-1 border rounded disabled:opacity-50">Next</button>
           </div>
         </CardContent>
       </Card>
