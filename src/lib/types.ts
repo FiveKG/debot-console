@@ -74,6 +74,13 @@ export interface FinderConfig {
   page_size: string;
 }
 
+export interface SellConfig {
+  take_profit_pct: number[];
+  take_profit_spreads: number[];
+  stop_loss_pct: number[];
+  stop_loss_spreads: number[];
+}
+
 export interface NarrativeGroup {
   id: number;
   narrative_key: string;

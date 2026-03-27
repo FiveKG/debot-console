@@ -59,6 +59,12 @@ export const getConfig = () => engine<{ code: number; data: Record<string, unkno
 export const updateConfig = (rules: Record<string, unknown>) =>
   engine<{ code: number }>('/api/config', { method: 'PUT', body: JSON.stringify({ rules }) });
 
+export const getSellConfig = () =>
+  engine<{ code: number; data: import('./types').SellConfig }>('/api/config/sell');
+
+export const updateSellConfig = (data: import('./types').SellConfig) =>
+  engine<{ code: number }>('/api/config/sell', { method: 'PUT', body: JSON.stringify(data) });
+
 // ─── Finder 账号管理（调用 finder API）───
 
 export const getAccounts = () =>

@@ -8,8 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { getConfig, updateConfig, getAccounts, createAccount, updateAccount, deleteAccount, getFinderConfig, updateFinderConfig } from '@/lib/api';
-import type { Account, FinderConfig } from '@/lib/types';
+import { getConfig, updateConfig, getAccounts, createAccount, updateAccount, deleteAccount, getFinderConfig, updateFinderConfig, getSellConfig, updateSellConfig } from '@/lib/api';
+import type { Account, FinderConfig, SellConfig } from '@/lib/types';
 
 export default function ConfigPage() {
   // Engine config
@@ -28,6 +28,15 @@ export default function ConfigPage() {
   const [finderCfg, setFinderCfg] = useState<FinderConfig>({ poll_interval_seconds: '1', chain: 'solana', page_size: '50' });
   const [finderMsg, setFinderMsg] = useState('');
 
+  // Sell config
+  const [sellCfg, setSellCfg] = useState<SellConfig>({
+    take_profit_pct: [0.2, 0.2, 0.1, 0.2, 0.3],
+    take_profit_spreads: [0.01, 0.02, 0.03, 0.03, 0.03],
+    stop_loss_pct: [0.2, 0.2, 0.1, 0.2, 0.3],
+    stop_loss_spreads: [0.01, 0.02, 0.03, 0.03, 0.03],
+  });
+  const [sellMsg, setSellMsg] = useState('');
+
   useEffect(() => {
     getConfig().then(r => {
       setRules(r.data);
@@ -39,6 +48,8 @@ export default function ConfigPage() {
     getFinderConfig().then(r => {
       setFinderCfg(r.data);
     }).catch(console.error);
+
+    getSellConfig().then(r => setSellCfg(r.data)).catch(console.error);
   }, []);
 
   const saveConfig = async () => {
@@ -79,6 +90,51 @@ export default function ConfigPage() {
     setAccounts(r.data);
   };
 
+  const saveSellConfig = async () => {
+    try {
+      if (sellCfg.take_profit_pct.length !== sellCfg.take_profit_spreads.length) {
+        setSellMsg('Take profit: pct 和 spreads 长度不一致'); return;
+      }
+      if (sellCfg.stop_loss_pct.length !== sellCfg.stop_loss_spreads.length) {
+        setSellMsg('Stop loss: pct 和 spreads 长度不一致'); return;
+      }
+      await updateSellConfig(sellCfg);
+      setSellMsg('Saved & Hot Reloaded');
+      setTimeout(() => setSellMsg(''), 2000);
+    } catch (e) {
+      setSellMsg(e instanceof Error ? e.message : 'Error');
+    }
+  };
+
+  const updateSellArray = (field: keyof SellConfig, index: number, value: string) => {
+    const arr = [...sellCfg[field]];
+    arr[index] = parseFloat(value) || 0;
+    setSellCfg({ ...sellCfg, [field]: arr });
+  };
+
+  const addSellLevel = (type: 'take_profit' | 'stop_loss') => {
+    setSellCfg({
+      ...sellCfg,
+      [`${type}_pct`]: [...sellCfg[`${type}_pct`], 0.1],
+      [`${type}_spreads`]: [...sellCfg[`${type}_spreads`], 0.01],
+    });
+  };
+
+  const removeSellLevel = (type: 'take_profit' | 'stop_loss', index: number) => {
+    setSellCfg({
+      ...sellCfg,
+      [`${type}_pct`]: sellCfg[`${type}_pct`].filter((_: number, i: number) => i !== index),
+      [`${type}_spreads`]: sellCfg[`${type}_spreads`].filter((_: number, i: number) => i !== index),
+    });
+  };
+
+  const computeTriggers = (spreads: number[]) => {
+    const triggers: number[] = [];
+    let sum = 0;
+    for (const s of spreads) { sum += s; triggers.push(sum); }
+    return triggers;
+  };
+
   const saveFinderConfig = async () => {
     try {
       const interval = parseFloat(finderCfg.poll_interval_seconds);
@@ -102,6 +158,7 @@ export default function ConfigPage() {
         <TabsList>
           <TabsTrigger value="finder">Finder Settings</TabsTrigger>
           <TabsTrigger value="accounts">Accounts ({accounts.length})</TabsTrigger>
+          <TabsTrigger value="trading">Trading Strategy</TabsTrigger>
           <TabsTrigger value="engine">Engine Rules</TabsTrigger>
         </TabsList>
 
@@ -199,6 +256,114 @@ export default function ConfigPage() {
               {accountMsg && <span className="text-sm text-green-600">{accountMsg}</span>}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* 卖出策略 */}
+        <TabsContent value="trading" className="mt-4 space-y-4">
+          {/* 止盈 */}
+          <Card>
+            <CardHeader><CardTitle>Take Profit (阶梯止盈)</CardTitle></CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Level</TableHead>
+                    <TableHead>Spread (间距)</TableHead>
+                    <TableHead>Trigger (触发点)</TableHead>
+                    <TableHead>Sell % (卖出比例)</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sellCfg.take_profit_spreads.map((_, i) => {
+                    const triggers = computeTriggers(sellCfg.take_profit_spreads);
+                    return (
+                      <TableRow key={i}>
+                        <TableCell>{i + 1}</TableCell>
+                        <TableCell>
+                          <Input type="number" step="0.001" min="0" className="w-24"
+                            value={sellCfg.take_profit_spreads[i]}
+                            onChange={e => updateSellArray('take_profit_spreads', i, e.target.value)} />
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">+{(triggers[i] * 100).toFixed(1)}%</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Input type="number" step="0.01" min="0" max="1" className="w-24"
+                            value={sellCfg.take_profit_pct[i]}
+                            onChange={e => updateSellArray('take_profit_pct', i, e.target.value)} />
+                        </TableCell>
+                        <TableCell>
+                          <button onClick={() => removeSellLevel('take_profit', i)} className="text-red-500 text-sm hover:underline">Remove</button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+              <div className="flex items-center gap-4 mt-2">
+                <Button variant="outline" size="sm" onClick={() => addSellLevel('take_profit')}>+ Add Level</Button>
+                <span className="text-xs text-muted-foreground">
+                  Pct Sum: {sellCfg.take_profit_pct.reduce((a, b) => a + b, 0).toFixed(2)}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 止损 */}
+          <Card>
+            <CardHeader><CardTitle>Stop Loss (阶梯止损)</CardTitle></CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Level</TableHead>
+                    <TableHead>Spread (间距)</TableHead>
+                    <TableHead>Trigger (触发点)</TableHead>
+                    <TableHead>Sell % (卖出比例)</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sellCfg.stop_loss_spreads.map((_, i) => {
+                    const triggers = computeTriggers(sellCfg.stop_loss_spreads);
+                    return (
+                      <TableRow key={i}>
+                        <TableCell>{i + 1}</TableCell>
+                        <TableCell>
+                          <Input type="number" step="0.001" min="0" className="w-24"
+                            value={sellCfg.stop_loss_spreads[i]}
+                            onChange={e => updateSellArray('stop_loss_spreads', i, e.target.value)} />
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="destructive">-{(triggers[i] * 100).toFixed(1)}%</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Input type="number" step="0.01" min="0" max="1" className="w-24"
+                            value={sellCfg.stop_loss_pct[i]}
+                            onChange={e => updateSellArray('stop_loss_pct', i, e.target.value)} />
+                        </TableCell>
+                        <TableCell>
+                          <button onClick={() => removeSellLevel('stop_loss', i)} className="text-red-500 text-sm hover:underline">Remove</button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+              <div className="flex items-center gap-4 mt-2">
+                <Button variant="outline" size="sm" onClick={() => addSellLevel('stop_loss')}>+ Add Level</Button>
+                <span className="text-xs text-muted-foreground">
+                  Pct Sum: {sellCfg.stop_loss_pct.reduce((a, b) => a + b, 0).toFixed(2)}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="flex items-center gap-2">
+            <Button onClick={saveSellConfig}>Save & Hot Reload</Button>
+            {sellMsg && <span className="text-sm text-green-600">{sellMsg}</span>}
+          </div>
         </TabsContent>
 
         {/* Engine 规则 */}
